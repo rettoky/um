@@ -9,16 +9,18 @@ import { Pagination, PaginationContent, PaginationItem, PaginationLink, Paginati
 import { Skeleton } from "@/components/ui/skeleton";
 
 // API 응답 타입을 정의합니다.
-interface NewsItem {
+interface SearchItem {
   title: string;
   originallink: string;
   link: string;
   description: string;
-  pubDate: string;
+  pubDate?: string; // 뉴스에만 존재
+  cafename?: string; // 카페에만 존재
+  cafeurl?: string; // 카페에만 존재
 }
 
 interface ApiResponse {
-  items: NewsItem[];
+  items: SearchItem[];
   total: number;
   start: number;
   display: number;
@@ -34,9 +36,10 @@ const dateFilters = [
 
 export default function Home() {
   // 상태 관리
+  const [searchType, setSearchType] = useState('news'); // 검색 유형 상태 추가
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('sim');
-  const [allNews, setAllNews] = useState<NewsItem[]>([]); // 모든 검색 결과를 저장
+  const [allItems, setAllItems] = useState<SearchItem[]>([]); // 모든 검색 결과를 저장
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,10 +59,10 @@ export default function Home() {
     setDateFilter(null);
     setSubQuery('');
     setCurrentPage(1);
-    setAllNews([]);
+    setAllItems([]);
 
     try {
-      const initialUrl = `/api/news?query=${encodeURIComponent(query)}&display=100&start=1&sort=${sort}`;
+      const initialUrl = `/api/search?query=${encodeURIComponent(query)}&display=100&start=1&sort=${sort}&type=${searchType}`;
       const initialRes = await fetch(initialUrl);
       const initialData: ApiResponse = await initialRes.json();
 
@@ -67,7 +70,7 @@ export default function Home() {
         throw new Error(initialData.error || `API call failed with status ${initialRes.status}`);
       }
 
-      let allItems: NewsItem[] = initialData.items;
+      let allItems: SearchItem[] = initialData.items;
       const total = initialData.total;
       const maxResults = Math.min(total, 1000);
 
@@ -75,7 +78,7 @@ export default function Home() {
       if (remainingCalls > 0) {
         const promises = Array.from({ length: remainingCalls }, (_, i) => {
           const start = (i + 1) * 100 + 1;
-          const url = `/api/news?query=${encodeURIComponent(query)}&display=100&start=${start}&sort=${sort}`;
+          const url = `/api/search?query=${encodeURIComponent(query)}&display=100&start=${start}&sort=${sort}&type=${searchType}`;
           return fetch(url).then(res => res.json());
         });
 
@@ -90,7 +93,7 @@ export default function Home() {
       if (allItems.length === 0) {
         setError('검색 결과가 없습니다.');
       }
-      setAllNews(allItems);
+      setAllItems(allItems);
 
     } catch (e: unknown) {
       if (e instanceof Error) {
@@ -104,45 +107,54 @@ export default function Home() {
     }
   };
 
-  const filteredNews = useMemo(() => {
-    let tempNews = allNews;
+  const filteredItems = useMemo(() => {
+    let tempItems = allItems;
 
     // 1. 검색 내 검색 (subQuery)
     if (subQuery) {
-      tempNews = tempNews.filter(item =>
+      tempItems = tempItems.filter(item =>
         item.title.toLowerCase().includes(subQuery.toLowerCase()) ||
         item.description.toLowerCase().includes(subQuery.toLowerCase())
       );
     }
 
-    // 2. 날짜 필터링
+    // 2. 날짜 필터링 (pubDate가 있는 경우에만)
     if (dateFilter !== null) {
       const now = new Date();
       const filterDate = new Date();
       filterDate.setDate(now.getDate() - dateFilter);
-      tempNews = tempNews.filter(item => new Date(item.pubDate) >= filterDate);
+      tempItems = tempItems.filter(item => item.pubDate && new Date(item.pubDate) >= filterDate);
     }
 
-    return tempNews;
-  }, [allNews, dateFilter, subQuery]);
+    return tempItems;
+  }, [allItems, dateFilter, subQuery]);
 
-  const totalPages = Math.ceil(filteredNews.length / displayPerPage);
-  const paginatedNews = useMemo(() => {
+  const totalPages = Math.ceil(filteredItems.length / displayPerPage);
+  const paginatedItems = useMemo(() => {
     const startIndex = (currentPage - 1) * displayPerPage;
-    return filteredNews.slice(startIndex, startIndex + displayPerPage);
-  }, [filteredNews, currentPage, displayPerPage]);
+    return filteredItems.slice(startIndex, startIndex + displayPerPage);
+  }, [filteredItems, currentPage, displayPerPage]);
 
   return (
     <main className="container mx-auto p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
         <header className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Naver News Search</h1>
-          <p className="text-muted-foreground">Enter a search query to find Naver news articles.</p>
+          <h1 className="text-3xl font-bold mb-2">Naver Search</h1>
+          <p className="text-muted-foreground">Enter a search query to find Naver news or cafe articles.</p>
         </header>
 
         <div className="flex flex-col md:flex-row gap-4 mb-8">
+          <Select value={searchType} onValueChange={setSearchType}>
+            <SelectTrigger className="w-full md:w-[120px]">
+              <SelectValue placeholder="Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="news">News</SelectItem>
+              <SelectItem value="cafe">Cafe</SelectItem>
+            </SelectContent>
+          </Select>
           <Input
-            placeholder="Search for news..."
+            placeholder={`Search for ${searchType}...`}
             className="flex-grow"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -176,13 +188,13 @@ export default function Home() {
                 <li><code className="font-semibold text-primary">+</code>: 반드시 포함 (예: <code className="bg-background p-1 rounded">반도체 +삼성</code>)</li>
                 <li><code className="font-semibold text-primary">-</code>: 제외 (예: <code className="bg-background p-1 rounded">아이폰 -가격</code>)</li>
                 <li><code className="font-semibold text-primary">|</code>: 또는 (예: <code className="bg-background p-1 rounded">자동차 |선박</code>)</li>
-                <li><code className="font-semibold text-primary">&quot; &quot;</code>: 정확히 일치 (예: <code className="bg-background p-1 rounded"> &quot;인공지능 비서&quot;</code>)</li>
+                <li><code className="font-semibold text-primary">&quot; &quot;</code>: 정확히 일치 (예: <code className="bg-background p-1 rounded">&quot;인공지능 비서&quot;</code>)</li>
               </ul>
             </div>
           )}
         </div>
 
-        {allNews.length > 0 && !loading && (
+        {allItems.length > 0 && !loading && (
           <div className="space-y-4 p-4 border rounded-lg mb-8">
              <Input
                 placeholder="결과 내 검색..."
@@ -194,7 +206,7 @@ export default function Home() {
               />
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                {dateFilters.map(filter => (
+                {searchType === 'news' && dateFilters.map(filter => (
                   <Button 
                     key={filter.label} 
                     variant={dateFilter === filter.days ? 'default' : 'outline'}
@@ -206,7 +218,7 @@ export default function Home() {
                 ))}
               </div>
               <p className="text-sm text-muted-foreground shrink-0 ml-4">
-                총 <span className="font-semibold text-primary">{filteredNews.length}</span>개 결과
+                총 <span className="font-semibold text-primary">{filteredItems.length}</span>개 결과
               </p>
             </div>
           </div>
@@ -222,18 +234,20 @@ export default function Home() {
             ))
           )}
           {error && <p className="text-red-500 text-center py-8">{error}</p>}
-          {!loading && !error && allNews.length === 0 && (
+          {!loading && !error && allItems.length === 0 && (
              <p className="text-center text-muted-foreground py-8">Search results will appear here.</p>
           )}
-          {paginatedNews.map((item, index) => (
+          {paginatedItems.map((item, index) => (
             <Card key={index}>
               <CardHeader>
                 <CardTitle dangerouslySetInnerHTML={{ __html: item.title }} />
-                <CardDescription>{new Date(item.pubDate).toLocaleString()}</CardDescription>
+                {item.pubDate && <CardDescription>{new Date(item.pubDate).toLocaleString()}</CardDescription>}
+                {item.cafename && <CardDescription>From: {item.cafename}</CardDescription>}
               </CardHeader>
               <CardContent><p dangerouslySetInnerHTML={{ __html: item.description }} /></CardContent>
               <CardFooter className="flex justify-end gap-4">
-                <Button variant="outline" asChild><a href={item.originallink} target="_blank" rel="noopener noreferrer">Read Original</a></Button>
+                {item.originallink && <Button variant="outline" asChild><a href={item.originallink} target="_blank" rel="noopener noreferrer">Read Original</a></Button>}
+                {item.cafeurl && <Button variant="outline" asChild><a href={item.cafeurl} target="_blank" rel="noopener noreferrer">Visit Cafe</a></Button>}
                 <Button asChild><a href={item.link} target="_blank" rel="noopener noreferrer">Read on Naver</a></Button>
               </CardFooter>
             </Card>

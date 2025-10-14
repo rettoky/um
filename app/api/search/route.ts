@@ -6,12 +6,14 @@ export async function GET(request: NextRequest) {
   const display = searchParams.get('display');
   const start = searchParams.get('start');
   const sort = searchParams.get('sort');
+  const type = searchParams.get('type') || 'news'; // 기본값을 'news'로 설정
 
   const clientId = process.env.NAVER_CLIENT_ID;
   const clientSecret = process.env.NAVER_CLIENT_SECRET;
 
   // --- DEBUGGING START ---
   console.log('--- API Route Debugging ---');
+  console.log('Search Type:', type);
   console.log('NAVER_CLIENT_ID loaded:', clientId ? `Yes, ends with ...${clientId.slice(-4)}` : 'No');
   console.log('NAVER_CLIENT_SECRET loaded:', clientSecret ? `Yes, ends with ...${clientSecret.slice(-4)}` : 'No');
   console.log('---------------------------');
@@ -31,7 +33,11 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const apiUrl = `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(query)}&display=${display}&start=${start}&sort=${sort}`;
+  const searchApiUrl = type === 'cafe'
+    ? 'https://openapi.naver.com/v1/search/cafearticle.json'
+    : 'https://openapi.naver.com/v1/search/news.json';
+
+  const apiUrl = `${searchApiUrl}?query=${encodeURIComponent(query)}&display=${display}&start=${start}&sort=${sort}`;
 
   try {
     const response = await fetch(apiUrl, {
