@@ -238,19 +238,16 @@ export default function Home() {
              <p className="text-center text-muted-foreground py-8">Search results will appear here.</p>
           )}
           {paginatedItems.map((item, index) => (
-            <Card key={index}>
-              <CardHeader>
-                <CardTitle dangerouslySetInnerHTML={{ __html: item.title }} />
-                {item.pubDate && <CardDescription>{new Date(item.pubDate).toLocaleString()}</CardDescription>}
-                {item.cafename && <CardDescription>From: {item.cafename}</CardDescription>}
-              </CardHeader>
-              <CardContent><p dangerouslySetInnerHTML={{ __html: item.description }} /></CardContent>
-              <CardFooter className="flex justify-end gap-4">
-                {item.originallink && <Button variant="outline" asChild><a href={item.originallink} target="_blank" rel="noopener noreferrer">Read Original</a></Button>}
-                {item.cafeurl && <Button variant="outline" asChild><a href={item.cafeurl} target="_blank" rel="noopener noreferrer">Visit Cafe</a></Button>}
-                <Button asChild><a href={item.link} target="_blank" rel="noopener noreferrer">Read on Naver</a></Button>
-              </CardFooter>
-            </Card>
+            <a key={index} href={item.originallink || item.link} target="_blank" rel="noopener noreferrer" className="block">
+              <Card className="transition-shadow duration-300 ease-in-out hover:shadow-xl cursor-pointer">
+                <CardHeader>
+                  <CardTitle dangerouslySetInnerHTML={{ __html: item.title }} />
+                  {item.pubDate && <CardDescription>{new Date(item.pubDate).toLocaleString()}</CardDescription>}
+                  {item.cafename && <CardDescription>From: {item.cafename}</CardDescription>}
+                </CardHeader>
+                <CardContent><p dangerouslySetInnerHTML={{ __html: item.description }} /></CardContent>
+              </Card>
+            </a>
           ))}
         </div>
 
