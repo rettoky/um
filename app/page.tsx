@@ -176,7 +176,7 @@ export default function Home() {
                 <li><code className="font-semibold text-primary">+</code>: 반드시 포함 (예: <code className="bg-background p-1 rounded">반도체 +삼성</code>)</li>
                 <li><code className="font-semibold text-primary">-</code>: 제외 (예: <code className="bg-background p-1 rounded">아이폰 -가격</code>)</li>
                 <li><code className="font-semibold text-primary">|</code>: 또는 (예: <code className="bg-background p-1 rounded">자동차 |선박</code>)</li>
-                <li><code className="font-semibold text-primary">" "</code>: 정확히 일치 (예: <code className="bg-background p-1 rounded"> &quot;인공지능 비서&quot;</code>)</li>
+                <li><code className="font-semibold text-primary">&quot; &quot;</code>: 정확히 일치 (예: <code className="bg-background p-1 rounded"> &quot;인공지능 비서&quot;</code>)</li>
               </ul>
             </div>
           )}

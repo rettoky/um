@@ -1,53 +1,16 @@
-Console Error
+> next build
 
-A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+   ▲ Next.js 15.5.5
+   - Environments: .env.local
 
-- A server/client branch `if (typeof window !== 'undefined')`.
-- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
-- Date formatting in a user's locale which doesn't match the server.
-- External changing data without sending a snapshot of it along with the HTML.
-- Invalid HTML tag nesting.
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 7.1s
 
-It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+Failed to compile.
 
-See more info here: https://nextjs.org/docs/messages/react-hydration-error
+./app/page.tsx
+179:66  Error: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities
+179:68  Error: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities
 
-
-  ...
-    <HotReload assetPrefix="" globalError={[...]}>
-      <AppDevOverlayErrorBoundary globalError={[...]}>
-        <ReplaySsrOnlyErrors>
-        <DevRootHTTPAccessFallbackBoundary>
-          <HTTPAccessFallbackBoundary notFound={<NotAllowedRootHTTPFallbackError>}>
-            <HTTPAccessFallbackErrorBoundary pathname="/" notFound={<NotAllowedRootHTTPFallbackError>} ...>
-              <RedirectBoundary>
-                <RedirectErrorBoundary router={{...}}>
-                  <Head>
-                  <__next_root_layout_boundary__>
-                    <SegmentViewNode type="layout" pagePath="layout.tsx">
-                      <SegmentTrieNode>
-                      <link>
-                      <RootLayout>
-                        <html lang="en" className="__variable...">
-                          <body
--                           cz-shortcut-listen="true"
-                          >
-                  ...
-app\layout.tsx (29:7) @ RootLayout
-
-
-  27 |   return (
-  28 |     <html lang="en" className={`${inter.variable} ${roboto_mono.variable}`}>
-> 29 |       <body>
-     |       ^
-  30 |         {children}
-  31 |       </body>
-  32 |     </html>
-Call Stack
-18
-
-Show 16 ignore-listed frame(s)
-body
-<anonymous>
-RootLayout
-app\layout.tsx (29:7)
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules
+ ELIFECYCLE  Command failed with exit code 1.
