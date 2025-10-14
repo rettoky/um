@@ -1,0 +1,15 @@
+# Git
+.git
+.gitignore
+
+# Dependencies
+node_modules
+
+# Build artifacts
+.next
+
+# Local environment
+.env.local
+
+# Documentation
+README.md

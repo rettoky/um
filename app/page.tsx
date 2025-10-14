@@ -1,103 +1,269 @@
-import Image from "next/image";
+'use client';
+
+import { useState, useMemo } from 'react';
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
+import { Skeleton } from "@/components/ui/skeleton";
+
+// API 응답 타입을 정의합니다.
+interface NewsItem {
+  title: string;
+  originallink: string;
+  link: string;
+  description: string;
+  pubDate: string;
+}
+
+interface ApiResponse {
+  items: NewsItem[];
+  total: number;
+  start: number;
+  display: number;
+  error?: string;
+}
+
+const dateFilters = [
+  { label: '전체', days: null },
+  { label: '1일', days: 1 },
+  { label: '3일', days: 3 },
+  { label: '7일', days: 7 },
+];
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  // 상태 관리
+  const [query, setQuery] = useState('');
+  const [sort, setSort] = useState('sim');
+  const [allNews, setAllNews] = useState<NewsItem[]>([]); // 모든 검색 결과를 저장
+  const [currentPage, setCurrentPage] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [dateFilter, setDateFilter] = useState<number | null>(null);
+  const [subQuery, setSubQuery] = useState(''); // 검색 내 검색을 위한 상태
+  const [isHelpOpen, setIsHelpOpen] = useState(false); // 도움말 토글 상태
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const displayPerPage = 100; // 한 페이지에 표시할 개수
+
+  const handleSearch = async () => {
+    if (!query) {
+      setError('검색어를 입력해주세요.');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setDateFilter(null);
+    setSubQuery('');
+    setCurrentPage(1);
+    setAllNews([]);
+
+    try {
+      const initialUrl = `/api/news?query=${encodeURIComponent(query)}&display=100&start=1&sort=${sort}`;
+      const initialRes = await fetch(initialUrl);
+      const initialData: ApiResponse = await initialRes.json();
+
+      if (!initialRes.ok || initialData.error) {
+        throw new Error(initialData.error || `API call failed with status ${initialRes.status}`);
+      }
+
+      let allItems: NewsItem[] = initialData.items;
+      const total = initialData.total;
+      const maxResults = Math.min(total, 1000);
+
+      const remainingCalls = Math.ceil((maxResults - 100) / 100);
+      if (remainingCalls > 0) {
+        const promises = Array.from({ length: remainingCalls }, (_, i) => {
+          const start = (i + 1) * 100 + 1;
+          const url = `/api/news?query=${encodeURIComponent(query)}&display=100&start=${start}&sort=${sort}`;
+          return fetch(url).then(res => res.json());
+        });
+
+        const results = await Promise.all(promises);
+        results.forEach((result: ApiResponse) => {
+          if (result.items) {
+            allItems = [...allItems, ...result.items];
+          }
+        });
+      }
+
+      if (allItems.length === 0) {
+        setError('검색 결과가 없습니다.');
+      }
+      setAllNews(allItems);
+
+    } catch (e: unknown) {
+      if (e instanceof Error) {
+        setError(`API 호출 중 오류가 발생했습니다: ${e.message}`);
+      } else {
+        setError(`An unknown error occurred.`);
+      }
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredNews = useMemo(() => {
+    let tempNews = allNews;
+
+    // 1. 검색 내 검색 (subQuery)
+    if (subQuery) {
+      tempNews = tempNews.filter(item =>
+        item.title.toLowerCase().includes(subQuery.toLowerCase()) ||
+        item.description.toLowerCase().includes(subQuery.toLowerCase())
+      );
+    }
+
+    // 2. 날짜 필터링
+    if (dateFilter !== null) {
+      const now = new Date();
+      const filterDate = new Date();
+      filterDate.setDate(now.getDate() - dateFilter);
+      tempNews = tempNews.filter(item => new Date(item.pubDate) >= filterDate);
+    }
+
+    return tempNews;
+  }, [allNews, dateFilter, subQuery]);
+
+  const totalPages = Math.ceil(filteredNews.length / displayPerPage);
+  const paginatedNews = useMemo(() => {
+    const startIndex = (currentPage - 1) * displayPerPage;
+    return filteredNews.slice(startIndex, startIndex + displayPerPage);
+  }, [filteredNews, currentPage, displayPerPage]);
+
+  return (
+    <main className="container mx-auto p-4 md:p-8">
+      <div className="max-w-4xl mx-auto">
+        <header className="mb-8">
+          <h1 className="text-3xl font-bold mb-2">Naver News Search</h1>
+          <p className="text-muted-foreground">Enter a search query to find Naver news articles.</p>
+        </header>
+
+        <div className="flex flex-col md:flex-row gap-4 mb-8">
+          <Input
+            placeholder="Search for news..."
+            className="flex-grow"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+          />
+          <div className="flex gap-4">
+            <Select value={sort} onValueChange={setSort}>
+              <SelectTrigger className="w-full md:w-[180px]">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="sim">Accuracy</SelectItem>
+                <SelectItem value="date">Date</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button className="w-full md:w-auto" onClick={handleSearch} disabled={loading}>
+              {loading ? 'Searching...' : 'Search'}
+            </Button>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+        
+        <div className="mb-8">
+          <div className="flex justify-end">
+            <Button variant="outline" size="sm" onClick={() => setIsHelpOpen(!isHelpOpen)}>
+              {isHelpOpen ? '도움말 닫기' : '검색 연산자 도움말'}
+            </Button>
+          </div>
+          {isHelpOpen && (
+            <div className="p-4 mt-2 bg-secondary/50 rounded-lg border text-sm text-muted-foreground">
+              <ul className="list-disc pl-5 space-y-2">
+                <li><code className="font-semibold text-primary">+</code>: 반드시 포함 (예: <code className="bg-background p-1 rounded">반도체 +삼성</code>)</li>
+                <li><code className="font-semibold text-primary">-</code>: 제외 (예: <code className="bg-background p-1 rounded">아이폰 -가격</code>)</li>
+                <li><code className="font-semibold text-primary">|</code>: 또는 (예: <code className="bg-background p-1 rounded">자동차 |선박</code>)</li>
+                <li><code className="font-semibold text-primary">" "</code>: 정확히 일치 (예: <code className="bg-background p-1 rounded"> &quot;인공지능 비서&quot;</code>)</li>
+              </ul>
+            </div>
+          )}
+        </div>
+
+        {allNews.length > 0 && !loading && (
+          <div className="space-y-4 p-4 border rounded-lg mb-8">
+             <Input
+                placeholder="결과 내 검색..."
+                value={subQuery}
+                onChange={(e) => {
+                  setCurrentPage(1); // 검색 내 검색 시 첫 페이지로 이동
+                  setSubQuery(e.target.value);
+                }}
+              />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {dateFilters.map(filter => (
+                  <Button 
+                    key={filter.label} 
+                    variant={dateFilter === filter.days ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => { setCurrentPage(1); setDateFilter(filter.days); }}
+                  >
+                    {filter.label}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-sm text-muted-foreground shrink-0 ml-4">
+                총 <span className="font-semibold text-primary">{filteredNews.length}</span>개 결과
+              </p>
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-4">
+          {loading && (
+            Array.from({ length: 5 }).map((_, index) => (
+              <Card key={index}>
+                <CardHeader><Skeleton className="h-6 w-3/4" /></CardHeader>
+                <CardContent><Skeleton className="h-4 w-full mb-2" /><Skeleton className="h-4 w-5/6" /></CardContent>
+              </Card>
+            ))
+          )}
+          {error && <p className="text-red-500 text-center py-8">{error}</p>}
+          {!loading && !error && allNews.length === 0 && (
+             <p className="text-center text-muted-foreground py-8">Search results will appear here.</p>
+          )}
+          {paginatedNews.map((item, index) => (
+            <Card key={index}>
+              <CardHeader>
+                <CardTitle dangerouslySetInnerHTML={{ __html: item.title }} />
+                <CardDescription>{new Date(item.pubDate).toLocaleString()}</CardDescription>
+              </CardHeader>
+              <CardContent><p dangerouslySetInnerHTML={{ __html: item.description }} /></CardContent>
+              <CardFooter className="flex justify-end gap-4">
+                <Button variant="outline" asChild><a href={item.originallink} target="_blank" rel="noopener noreferrer">Read Original</a></Button>
+                <Button asChild><a href={item.link} target="_blank" rel="noopener noreferrer">Read on Naver</a></Button>
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
+
+        {totalPages > 1 && (
+          <Pagination className="mt-8">
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); setCurrentPage(p => Math.max(1, p - 1)); }} className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''} />
+              </PaginationItem>
+              {[...Array(Math.min(totalPages, 10))].map((_, i) => {
+                  const page = currentPage > 5 ? Math.min(currentPage - 5 + i, totalPages - 9 + i) : i + 1;
+                  if (page > totalPages) return null;
+                  return (
+                    <PaginationItem key={i}>
+                        <PaginationLink href="#" isActive={page === currentPage} onClick={(e) => { e.preventDefault(); setCurrentPage(page); }}>
+                        {page}
+                        </PaginationLink>
+                    </PaginationItem>
+                  )
+              })}
+              <PaginationItem>
+                <PaginationNext href="#" onClick={(e) => { e.preventDefault(); setCurrentPage(p => Math.min(totalPages, p + 1)); }} className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''} />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        )}
+      </div>
+    </main>
   );
 }
